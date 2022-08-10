@@ -1,0 +1,264 @@
+---
+title: "STA6235 - Project 2 Assignment"
+author: "Gabriel Rivera Alvarez"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Libraries Used
+```{r}
+# Libraries to be used
+library(tidyverse)
+library(car)
+```
+
+## Dataset Reading
+```{r}
+# Load dataset
+data <- read.csv("/Users/gabrielrivera/Documents/Maestria/Courses/4- Summer 2022/STA6235/Project 2/Walmart_Store_sales.csv")
+```
+
+## Dataset Display
+```{r}
+#Display first 5 rows of the dataset
+head(data,5)
+```
+
+## Dataset Description
+As stated in Project 1, the dataset being used comes from Kaggle. The link to the dataset is: https://www.kaggle.com/datasets/rutuspatel/walmart-dataset-retail. This dataset contains columns that are: Store, Date, Weekly_Sales, Holiday_Flag, Temperature, Fuel_Price, CPI, and Unemployment. This dataset contains one categorical predictor, which is Holiday_Flag. This will be one of my categorical variables. Since the dataset does not contain another categorical predictor, I will filter the dataset to contain only stores 1 and 2. A categorical predictor will be generated to have Store 1 as 0 and Store 2 as 1. For the continuous predictors, I will be using Temperature and Fuel Price. The combination of this 4 variables will be used to determine a model to see if they are good predictors for the outcome of Weekly Sales.
+
+## Dataset Filtering
+```{r}
+# Remove all the rows that do not belong to Store 1 or Store 2
+data <- filter(data, Store <=2)
+```
+
+## Addition of Categorical Variable Based on Store
+```{r}
+# Add Column for categorical variable based on store. Put 0 if store 1 and put 1 if store 2
+data$Store_No <- if_else(data$Store == 1, as.integer(0), as.integer(1))
+```
+
+## Dataset Extraction and Display
+```{r}
+# Put variables of interest as a tibble
+dataset <- tibble(WkSales = data$Weekly_Sales, Temp = data$Temperature, Fuel_Price = data$Fuel_Price, Holiday = data$Holiday_Flag, Store_No = data$Store_No)
+head(dataset,5)
+```
+
+## Statistical Summary
+```{r}
+# Statistics summary
+summarize(dataset, mean_WkSales    = mean(dataset$WkSales, na.rm=TRUE),    sd_WkSales =sd(dataset$WkSales, na.rm=TRUE),
+                   mean_Temp       = mean(dataset$Temp, na.rm=TRUE),       sd_Temp =sd(dataset$Temp, na.rm=TRUE),
+                   mean_Fuel_Price = mean(dataset$Fuel_Price, na.rm=TRUE), sd_Fuel_Price =sd(dataset$Fuel_Price, na.rm=TRUE))
+```
+
+Doing a statistical summary we get an average Weekly Sales of $1,740,508 with a standard deviation of 273,323.1. For Temperature we have an average of 68.26157 degrees with a standard deviation of 14.85853. For Fuel Price we have an average of 3.219699 with a standard deviation of 0.4265622. Mean and standard deviation is not computed for Holiday and Store Number because they are categorical variables with either 0's or 1's. They are not continuous and there's no meaning in computing an average or a standard deviation.
+
+## Multiple Linear Regression Model
+```{r}
+m1 <- lm(WkSales ~ Temp + Fuel_Price + Holiday + Store_No + Holiday:Store_No, data = dataset)
+summary(m1)
+```
+## Intercept and Slope Extraction for Full Model
+```{r}
+lin_coeff <- coefficients(m1)
+lin_coeff
+```
+
+## Resulting Multiple Linear Regression Model is:
+
+\[ \hat{WkSales} = `r round(lin_coeff[1],2)` + `r round(lin_coeff[2],2)`*Temp + `r round(lin_coeff[3],2)`*FuelPrice + `r round(lin_coeff[4],2)`*Holiday + `r round(lin_coeff[5],2)`*StoreNo + 44976.5*Holiday:StoreNo\]
+
+## Testing if the Interaction Between Holiday and Store Number is a Significant Predictor
+```{r}
+full <- m1
+reduced <- m1 <- lm(WkSales ~ Temp + Fuel_Price + Holiday + Store_No, data = dataset)
+anova(reduced,full)
+```
+
+##### Hypotheses
+
+  - $H_0: \ \beta_{\text{Hol_Sto}} = 0$
+  - $H_1: \ \beta_{\text{Hol_Sto}} \ne 0$
+
+##### Test Statistics
+
+  - $F_0 = 0.2519$
+  - $p$-Value $= 0.6162$
+  
+##### Rejection Region
+
+  - Reject $H_0$ if $p$-Value $< \alpha$; $\alpha = 0.05$
+
+##### Conclusion and Interpretation
+
+  - FTR $H_0$. There is not sufficient evidence to suggest that the interaction between Holiday and Store Number is a significant predictor of Weekly Sales.
+
+## Testing if the Continuous Predictors are Significant Predictors
+```{r}
+full <- m1
+reduced <- lm(WkSales ~ Holiday + Store_No + Holiday:Store_No, data = dataset)
+anova(reduced,full)
+```
+
+##### Hypotheses
+
+  - $H_0: \ \beta_{\text{Temp}} = \beta_{\text{Fuel_Price}} = 0$
+  - $H_1:$ at least one $\beta_i \ne 0$
+
+##### Test Statistics
+
+  - $F_0 = 16.769$
+  - $p$-Value $< 0.001$
+  
+##### Rejection Region
+
+  - Reject $H_0$ if $p$-Value $< \alpha$; $\alpha = 0.05$
+
+##### Conclusion and Interpretation**
+
+  - Reject $H_0$. There is sufficient evidence to suggest that the continuous predictors Temperature and Fuel Price are significant predictors of Weekly Sales.
+
+## Final Multiple Linear Regression Model
+```{r}
+m2 <- lm(WkSales ~ Temp + Fuel_Price + Holiday + Store_No, data = dataset)
+```
+
+## Intercept and Slope Extraction for Final Model
+```{r}
+lin_coeff <- coefficients(m2)
+lin_coeff
+```
+
+## Resulting Final Multiple Linear Regression Model is:
+
+\[ \hat{WkSales} = `r round(lin_coeff[1],2)` + `r round(lin_coeff[2],2)`*Temp + `r round(lin_coeff[3],2)`*FuelPrice + `r round(lin_coeff[4],2)`*Holiday + `r round(lin_coeff[5],2)`*StoreNo\]
+
+## Testing for Significant Predictor
+```{r}
+summary(m2)
+```
+
+### Is Temperature a Significant Predictor?
+
+##### Hypotheses
+
+  - $H_0: \ \beta_{\text{Temp}} = 0$
+  - $H_1:$ at least one $\beta_i \ne 0$
+
+##### Test Statistics
+
+  - $t_0 = 4.024$
+  - $p$-Value $< 0.001$
+  
+##### Rejection Region
+
+  - Reject $H_0$ if $p$-Value $< \alpha$; $\alpha = 0.05$
+
+##### Conclusion and Interpretation
+
+  - Reject $H_0$. There is sufficient evidence to suggest that Temperature is a significant predictor of Weekly Sales.
+
+
+### Is Fuel Price a Significant Predictor?
+
+##### Hypotheses
+
+  - $H_0: \ \beta_{\text{Fuel_Price}} = 0$
+  - $H_1:$ at least one $\beta_i \ne 0$
+
+##### Test Statistics
+
+  - $t_0 = 0.077$
+  - $p$-Value $= 0.9383$
+  
+##### Rejection Region
+
+  - Reject $H_0$ if $p$-Value $< \alpha$; $\alpha = 0.05$
+
+##### Conclusion and Interpretation
+
+  - FTR $H_0$. There is not sufficient evidence to suggest that the Fuel Price is a significant predictor of Weekly Sales.
+
+
+### Is Holiday a Significant Predictor?
+
+##### Hypotheses
+
+  - $H_0: \ \beta_{\text{Holiday}} = 0$
+  - $H_1:$ at least one $\beta_i \ne 0$
+
+##### Test Statistics
+
+  - $t_0 = 2.298$
+  - $p$-Value $= 0.0223$
+  
+##### Rejection Region
+
+  - Reject $H_0$ if $p$-Value $< \alpha$; $\alpha = 0.05$
+
+##### Conclusion and Interpretation
+
+  - Reject $H_0$. There is sufficient evidence to suggest that Holiday is a significant predictor of Weekly Sales.
+
+
+### Is Store Number a Significant Predictor?
+
+##### Hypotheses
+
+  - $H_0: \ \beta_{\text{Store_No}} = 0$
+  - $H_1:$ at least one $\beta_i \ne 0$
+
+##### Test Statistics
+
+  - $t_0 = 16.218$
+  - $p$-Value $< 0.001$
+  
+##### Rejection Region
+
+  - Reject $H_0$ if $p$-Value $< \alpha$; $\alpha = 0.05$
+
+##### Conclusion and Interpretation
+
+  - Reject $H_0$. There is sufficient evidence to suggest that Store Number is a significant predictor of Weekly Sales.
+
+
+## Predictor Interpretation
+
+  - Temperature Interpretation: For every increase of $1 in weekly sales, we expect for Temperature to decrease by 3225.0, after adjusting for Fuel Price, Holiday, and Store Number.
+  
+  - Fuel Price Interpretation: For every increase of $1 in weekly sales, we expect for Fuel Price to decrease by 2127.7, after adjusting for Temperature, Holiday, and Store Number.
+    
+  - Holiday Interpretation: For a Holiday, we expect for weekly sales to increase by $104,960.4, after adjusting for Temperature, Fuel Price, and Store Number.
+
+  - Store Number Interpretation: For a Store Number, we expect for weekly sales to increase by $370,194.3, after adjusting for Fuel Price, Holiday, and Store Number.
+
+
+## Data Visualization
+```{r}
+#Plot of Weekly Sales vs Temperature
+dataset %>% ggplot(aes(x=Temp, y=WkSales, color=Store_No)) +
+  geom_point() +
+  geom_smooth(method=lm, se=FALSE, formula=y~x,color="orange") +
+  theme_minimal()
+
+#Plot of Weekly Sales vs Fuel Price
+dataset %>% ggplot(aes(x=Fuel_Price, y=WkSales, color=Store_No)) +
+  geom_point() +
+  geom_smooth(method=lm, se=FALSE, formula=y~x,color="orange") +
+  theme_minimal()
+
+#Added Variable Plot
+avPlots(m2, col.lines="orange")
+```
+
+
+## Final Remarks
+
+Based on the results of the final model, the Temperature, Holiday and Store Number are significant predictors of Weekly Sales. On the other hand, Fuel Price is not a significant predictor of Weekly Sales. This means that Temperature, Holiday and Store Number must be present in the model but Fuel Price could be dropped from the final model. Because we are working with multiple linear regression, it becomes a very difficult task to show a regression line on a 2-D plot when there are various predictors that are being taken into consideration for a single outcome. For this, I use an added variable plot because this plot takes the effects that one predictor can have in the outcome variable can be observed while taking into consideration other predictors in the model. The added variable plots for Temperature and Fuel Price predicting Weekly Sales make sense with the data recorded because those variables are continuous. On the other hand, the same plot but on Holiday and Store Number do not make sense because those variables are categorical and are either a 0 or a 1. Nonetheless, these plots help us visualize the data and compare it to our results. Other statistical tools could be used to help to determine how good the generated model is. In conclusion, with the numerical results and data visualization, it seems like the model generated is a good linear fit.
