@@ -1,0 +1,194 @@
+---
+title: "STA6235 - Project 3 Assignment"
+author: "Gabriel Rivera Alvarez"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Libraries Used
+```{r}
+# Libraries to be used
+library(tidyverse)
+library(car)
+library(olsrr)
+library(lindia)
+library(MASS)
+library(alr4)
+```
+
+## Dataset Reading
+```{r}
+# Load dataset
+data <- read.csv("/Users/gabrielrivera/Documents/Maestria/Courses/4- Summer 2022/STA6235/Project 3/Walmart_Store_sales.csv")
+```
+
+## Dataset Display
+```{r}
+#Display first 5 rows of the dataset
+head(data,5)
+```
+
+## Dataset Description
+As stated in Project 1 and 2, the dataset being used comes from Kaggle. The link to the dataset is: https://www.kaggle.com/datasets/rutuspatel/walmart-dataset-retail. This dataset contains columns that are: Store, Date, Weekly_Sales, Holiday_Flag, Temperature, Fuel_Price, CPI, and Unemployment. This dataset contains one categorical predictor, which is Holiday_Flag. This will be one of my categorical variables. Since the dataset does not contain another categorical predictor, I will filter the dataset to contain only stores 1 and 2. A categorical predictor will be generated to have Store 1 as 0 and Store 2 as 1. For the continuous predictors, I will be using Temperature and Fuel Price. The combination of this 4 variables will be used to determine a model to see if they are good predictors for the outcome of Weekly Sales.
+
+## Dataset Filtering
+```{r}
+# Remove all the rows that do not belong to Store 1 or Store 2
+data <- filter(data, Store <=2)
+```
+
+## Addition of Categorical Variable Based on Store
+```{r}
+# Add Column for categorical variable based on store. Put 0 if store 1 and put 1 if store 2
+data$Store_No <- if_else(data$Store == 1, as.integer(0), as.integer(1))
+```
+
+## Dataset Extraction and Display
+```{r}
+# Put variables of interest as a tibble
+dataset <- tibble(WkSales = data$Weekly_Sales, Temp = data$Temperature, Fuel_Price = data$Fuel_Price, Holiday = data$Holiday_Flag, Store_No = data$Store_No)
+head(dataset,5)
+```
+
+## Multiple Linear Regression Model with Interaction
+```{r}
+m1 <- lm(WkSales ~ Temp + Fuel_Price + Holiday + Store_No + Holiday:Store_No, data = dataset)
+summary(m1)
+```
+
+## Intercept and Slope Extraction for Model with Interaction
+```{r}
+lin_coeff <- coefficients(m1)
+lin_coeff
+```
+
+## Resulting Multiple Linear Regression Model with Interaction is:
+
+\[ \hat{WkSales} = `r round(lin_coeff[1],2)` + `r round(lin_coeff[2],2)`*Temp + `r round(lin_coeff[3],2)`*FuelPrice + `r round(lin_coeff[4],2)`*Holiday + `r round(lin_coeff[5],2)`*StoreNo + `r round(lin_coeff[6],2)`*Holiday:StoreNo\]
+
+## Multiple Linear Regression Model without Interaction
+```{r}
+m2 <- lm(WkSales ~ Temp + Fuel_Price + Holiday + Store_No, data = dataset)
+summary(m2)
+```
+
+## Intercept and Slope Extraction for Model without Interaction
+```{r}
+lin_coeff <- coefficients(m2)
+lin_coeff
+```
+
+## Resulting Multiple Linear Regression Model without Interaction is:
+
+\[ \hat{WkSales} = `r round(lin_coeff[1],2)` + `r round(lin_coeff[2],2)`*Temp + `r round(lin_coeff[3],2)`*FuelPrice + `r round(lin_coeff[4],2)`*Holiday + `r round(lin_coeff[5],2)`*StoreNo\]
+
+## AIC
+```{r}
+AIC_m1 <- AIC(m1)
+AIC_m2 <- AIC(m2)
+```
+
+## $R^2_{adj}$
+```{r}
+s1 <- summary(m1)
+Rsqr_m1 <- s1$adj.r.squared
+s2 <- summary(m2)
+Rsqr_m2 <- s2$adj.r.squared
+```
+
+## Tabulated Results
+```{r}
+c1 <- c('m1','m2')
+c2 <- c(round(AIC_m1,digits=2),round(AIC_m2,digits=2))
+c3 <- c(round(Rsqr_m1,digits=5),round(Rsqr_m2,digits=5))
+results <- data.frame(c1,c2,c3)
+names(results) <- c('Model','AIC','Adjusted R-squared')
+results <- as_tibble(results)
+results
+```
+
+## Model Analysis
+
+ - The final model selected in Project 2 was the model without the interaction term. Looking at the AIC from the tabulated results, it can be observed that the model without interaction has a value of 7780.10. This value is slightly lower than the 7781.85 AIC value of the model with interaction. The desired model is the model with the lowest AIC. In this case, that model is the model without the interaction term. Based on the AIC results, it can be concluded that the model without interaction (m2) has a slightly better fit. This conclusion goes along with the model selected in Project 2. In both cases, model without interaction is the best model. 
+
+ - Looking at the $R^2_{adj}$, it can be observed that the model without the interaction has a $R^2_{adj}$ of 0.50136 versus 0.50003 for the model with the interaction term. Based on this, the model with no interaction terms is slightly better $R^2_{adj}$. This means that model with no interactions can account for a slightly higher variability of Weekly Sales compared to the model that contains interactions. Based on $R^2_{adj}$ results, it can be concluded that the model without interaction (m2) has a slightly better fit. This conclusion goes along with the model selected in Project 2 because in both cases the model without interaction is the best model. 
+
+ - Looking at the individual analysis of AIC and $R^2_{adj}$, it can be observed that in both cases the model without interaction offers a slightly better fit. Comparing this two results in conjuction with the model selected in Project 2, it can be observed that in all three cases the model without interaction terms is choosen because it is a better fit.
+
+## Selected Best Model
+
+\[ \hat{WkSales} = `r round(lin_coeff[1],2)` + `r round(lin_coeff[2],2)`*Temp + `r round(lin_coeff[3],2)`*FuelPrice + `r round(lin_coeff[4],2)`*Holiday + `r round(lin_coeff[5],2)`*StoreNo\]
+
+## Potential Outlier Identification
+```{r}
+# Studentized Deleted Residuals
+dataset$Stud_Residuals <- studres(m2)
+
+# Residuals Flag Variable
+dataset$Residuals_Flag <- if_else(abs(dataset$Stud_Residuals) >= 3, 1 , 0)
+
+# Filter potential outliers
+pot_outliers <- dataset %>% filter(Residuals_Flag == 1)
+pot_outliers
+```
+- Potential outliers are identified. Studentized residuals with an absolute value of greater or equal to 3 are considered far enough, and therefore potential outliers. From this analysis, 6 potential outliers are identified. 
+
+## Studentized Residuals Visualization
+```{r}
+# Plot to help identify the potential outliers determined previously
+ols_plot_resid_stud(m2)
+```
+
+## Potential Influential/Leverage Points Identification
+```{r}
+# Influence Measures 
+influence_measures <- as_tibble(influence.measures(m2)$infmat)
+
+# Add Cook's Distance to Dataset
+dataset$Cook_Dist <- influence_measures$cook.d
+
+# Cook's Distance Flag Variable
+dataset$Cook_Dist_Flag <- if_else(abs(dataset$Cook_Dist) >= 4/nrow(dataset), 1 , 0)
+
+# Potential Influential/Leverage Points
+pot_influ_lev <- dataset %>% filter(Cook_Dist_Flag == 1)
+pot_influ_lev
+```
+- Potential influential/leverage points are identified. To do this, Cook's distance is obtained. Here, distances that are greater than 4/n, or approximately 0.014 based on a sample size of 286, are considered potential influential/leverage points. From this analysis, 16 points fall under that category.
+
+## Cook's Distance Visualization
+```{r}
+# Plot to help identify the potential influential/leverage points determined previously
+gg_cooksd(m2) + theme_bw()
+```
+
+
+## Multicollinearity Assessment
+```{r}
+vif(m2)
+```
+- Performing a multicollinearity assessment it can be observed that the correlation between the predictors is minimal because all 4 VIF's are close to 1. This means that because of such small values, it is not expected to have estimation issues due to correlation between predictors.
+
+## Regression Assumptions Assessment
+```{r}
+##
+almost_sas <- function(aov.results){
+  aov_residuals <- residuals(aov.results)
+  par(mfrow=c(2,2))
+  plot(aov.results, which=1)
+  hist(aov_residuals)
+  plot(aov.results, which=2)
+  plot(density(aov_residuals))
+}
+almost_sas(m2)
+```
+
+- Doing a regression assessment it can be observed that the residuals follow a normal distribution with 0 mean and $\sigma^2$ variance. From The histogram it can be observed that the data is skewed. From Q-Q plot it can be observed that the points at the end of the line are the ones skewing the data.
+
+## Next Steps
+
+- Perform a sensitivity analysis to remove the problematic data points, re-create the model and see what are the differences between both. To do this the sensitivity analysis would be split in three parts. In the first part only the outliers would be removed, in the second part only the influential/leverage points and lastly, both outliers and influential/leverage. The goal would be to achieve assess the regression assumptions and see if the skewness can be improved.
